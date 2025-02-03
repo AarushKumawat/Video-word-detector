@@ -1,2 +1,2 @@
 # Video-word-detector
-This is a extension that will scan the full video the will timestamp according to the words.
+This is an extension that will scan the full video that will timestamp according to the word.
