@@ -23,7 +23,7 @@ public class TranscriptionController {
     private final RestTemplate restTemplate = new RestTemplate();
 
     private static final String REPLICATE_API_URL = "https://api.replicate.com/v1/predictions";
-    private static final String REPLICATE_API_KEY = "r8_PoaqBZGxwIGhicKRK9mKEwLSBACCk0y0AWfZj";  // Replace with your Replicate API key
+    private static final String REPLICATE_API_KEY = "API_KEY";  // Replace with your Replicate API key
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file) {
