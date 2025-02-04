@@ -3,8 +3,7 @@ package com.video.word.Controllers;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Files;  // ✅ FIX: Import this to resolve "Files cannot be resolved" error
 
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -21,35 +20,47 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.video.word.config.ReplicateConfig;
 
-@CrossOrigin(origins = "chrome-extension://${replicateConfig.extensionId}")  // Dynamic extension ID
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j; // Import SLF4J Logger
+
 @RestController
 @RequestMapping("/api/transcription")
+@Slf4j // SLF4J Logger annotation
 public class TranscriptionController {
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ReplicateConfig replicateConfig;
+    private final String allowedOrigin;
 
     public TranscriptionController(ReplicateConfig replicateConfig) {
         this.replicateConfig = replicateConfig;
+        this.allowedOrigin = "chrome-extension://" + replicateConfig.getExtensionId();
     }
 
+    @PostConstruct
+    public void configureCors() {
+        log.info("CORS Allowed Origin: {}", allowedOrigin); // Log CORS allowed origin
+    }
+
+    @CrossOrigin(origins = "*")  // Set dynamically using response headers
     @PostMapping("/upload")
     public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file) {
+        log.info("Received upload request for file: {}", file.getOriginalFilename()); // Log file name
+
         try {
-            // Save the file locally
             File audioFile = convertMultipartFileToFile(file);
+            log.info("File converted to temp file: {}", audioFile.getAbsolutePath()); // Log temp file path
 
-            // Convert audio file to a Base64-encoded string
             String base64Audio = encodeFileToBase64(audioFile);
+            log.debug("Base64 encoded audio: {}", base64Audio.substring(0, Math.min(100, base64Audio.length()))); // Log the first 100 chars of base64 string
 
-            // Prepare the API request
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Token " + replicateConfig.getApiKey());
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             String requestBody = """
                 {
-                  "version": "9ca6e9d9d270e8e4bcb792b71cb3171ce172f6f589019083a5d9d54048c67e34",
+                  "version": "8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e",
                   "input": {
                     "audio": "%s"
                   }
@@ -57,14 +68,20 @@ public class TranscriptionController {
                 """.formatted(base64Audio);
 
             HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
-
             ResponseEntity<String> response = restTemplate.postForEntity("https://api.replicate.com/v1/predictions", request, String.class);
-
+            
             audioFile.delete();  // Cleanup temporary file
+            log.info("Temporary file deleted: {}", audioFile.getAbsolutePath());
 
-            return ResponseEntity.ok(response.getBody());
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.set("Access-Control-Allow-Origin", allowedOrigin);
+
+            log.info("Transcription API response: {}", response.getBody()); // Log the API response
+
+            return ResponseEntity.ok().headers(responseHeaders).body(response.getBody());
 
         } catch (IOException e) {
+            log.error("File processing failed for file: {}", file.getOriginalFilename(), e); // Log error with exception
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("File processing failed");
         }
     }
@@ -80,7 +97,7 @@ public class TranscriptionController {
     }
 
     private String encodeFileToBase64(File file) throws IOException {
-        byte[] fileBytes = Files.readAllBytes(Paths.get(file.getAbsolutePath()));
+        byte[] fileBytes = Files.readAllBytes(file.toPath());  // ✅ Uses correct import now
         return java.util.Base64.getEncoder().encodeToString(fileBytes);
     }
 }
